@@ -75,5 +75,3 @@ export const sampleIdeas = [
   "An AI copilot for indie e-commerce brands to forecast inventory",
   "A marketplace connecting climate startups with vetted technical talent",
 ];
-
-export type SavedAnalysis = { id: string; createdAt: string; analysis: Analysis };

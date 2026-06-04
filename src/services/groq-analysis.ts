@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { StartupIdeaAnalysis } from "@/lib/atlas/analysis";
 
 const GROQ_MODEL = "llama-3.3-70b-versatile";
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
@@ -23,8 +24,6 @@ const analysisSchema = z.object({
   keyRisks: z.array(z.string()),
   investorPitch: z.string(),
 });
-
-export type StartupIdeaAnalysis = z.infer<typeof analysisSchema>;
 
 function createSafeDefaultAnalysis(): StartupIdeaAnalysis {
   return {

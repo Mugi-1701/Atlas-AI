@@ -50,17 +50,6 @@ export function AppShell({ children }: { children: ReactNode }) {
             );
           })}
         </nav>
-
-        <div className="mt-auto p-4">
-          <div className="glass-card rounded-xl p-4">
-            <div className="text-xs text-muted-foreground mb-1">Plan</div>
-            <div className="text-sm font-medium">Founder · Beta</div>
-            <div className="mt-3 h-1.5 rounded-full bg-muted overflow-hidden">
-              <div className="h-full w-2/3" style={{ background: "var(--gradient-primary)" }} />
-            </div>
-            <div className="mt-2 text-[11px] text-muted-foreground">12 of 20 analyses used</div>
-          </div>
-        </div>
       </aside>
 
       {/* Main */}

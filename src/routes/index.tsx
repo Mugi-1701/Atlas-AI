@@ -2,6 +2,11 @@ import { createFileRoute } from "@tanstack/react-router";
 import { IdeaAnalyzer } from "@/components/atlas/IdeaAnalyzer";
 
 export const Route = createFileRoute("/")({
+  validateSearch: (search: Record<string, unknown>) => {
+    return {
+      id: search.id as string | undefined,
+    }
+  },
   head: () => ({
     meta: [
       { title: "Atlas AI — Idea Analyzer" },

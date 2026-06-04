@@ -2,8 +2,10 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ArrowRight, Loader2, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { useSearch, useNavigate } from "@tanstack/react-router";
 import { analyzeStartupIdeaFn } from "@/lib/api/groq.functions";
-import { type SavedAnalysis, type StartupIdeaAnalysis } from "@/lib/atlas/analysis";
+import { type SavedAnalysis, type StartupIdeaAnalysis, sampleIdeas } from "@/lib/atlas/analysis";
+import { getSafeDefaultAnalysis } from "@/services/groq-analysis";
 import { ResultCards } from "./ResultCards";
 
 const STORAGE_KEY = "atlas-ai-analysis-history";
@@ -52,9 +54,23 @@ export function IdeaAnalyzer() {
   const requestIdRef = useRef(0);
   const loadingTimerRef = useRef<number | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const search = useSearch({ strict: false }) as { id?: string };
+  const navigate = useNavigate();
 
   useEffect(() => {
-    setSavedAnalyses(readSavedAnalyses());
+    const loaded = readSavedAnalyses();
+    setSavedAnalyses(loaded);
+
+    if (search.id) {
+      const found = loaded.find((item) => item.id === search.id);
+      if (found) {
+        setIdea(found.idea);
+        setAnalysis(found.analysis);
+      } else {
+        toast.error("Failed to load analysis");
+      }
+      navigate({ to: "/", search: { id: undefined }, replace: true });
+    }
   }, []);
 
   useEffect(() => {
@@ -111,8 +127,7 @@ export function IdeaAnalyzer() {
     setLoading(true);
 
     try {
-      const result = await analyzeStartupIdeaFn(trimmedIdea);
-
+      const result = await analyzeStartupIdeaFn({ data: { idea: trimmedIdea } });
       if (requestIdRef.current !== requestId) return;
 
       console.log("Analysis Result:", result);
@@ -126,6 +141,7 @@ export function IdeaAnalyzer() {
 
       const nextSaved = [
         {
+          id: crypto.randomUUID(),
           idea: trimmedIdea,
           ideaKey: cacheKey,
           analysis: result,
@@ -147,92 +163,85 @@ export function IdeaAnalyzer() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
-        <div className="mx-auto flex w-full max-w-3xl flex-col items-center text-center">
-          <div className="inline-flex items-center gap-2 rounded-full border border-cyan-400/30 bg-cyan-400/10 px-4 py-2 text-xs font-medium tracking-[0.2em] text-cyan-200 uppercase">
+    <div className="min-h-screen bg-slate-950 text-slate-100 pb-24">
+      <div className="mx-auto flex w-full flex-col px-4 py-10 sm:px-6 lg:px-8 max-w-7xl">
+        <div className="mx-auto flex w-full flex-col items-center text-center mt-12 mb-16">
+          <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-medium tracking-[0.1em] text-slate-300">
             <Sparkles className="h-4 w-4" />
             AI Co-Founder · Beta
           </div>
 
-          <div className="mt-5 space-y-4">
-            <h1 className="text-4xl font-semibold tracking-tight text-white sm:text-5xl lg:text-6xl">
-              Validate Your Startup Idea with AI
+          <div className="mt-8 space-y-6 max-w-4xl">
+            <h1 className="text-5xl font-bold tracking-tight text-white md:text-[72px] md:leading-[1.1]">
+              Validate Your Startup <br className="hidden md:block" /> Idea <span className="text-indigo-400">with AI</span>
             </h1>
-            <p className="mx-auto max-w-2xl text-base leading-7 text-slate-300 sm:text-lg">
-              Atlas AI guides you from raw idea to investor-ready validation,
-              SWOT analysis, MVP planning, revenue strategy, and investor
-              pitch.
+            <p className="mx-auto max-w-2xl text-base leading-relaxed text-slate-400 md:text-lg">
+              Atlas AI guides you from raw idea to investor-ready plan — validation score, SWOT,
+              MVP scope, revenue model, and pitch in seconds.
             </p>
           </div>
         </div>
 
-        <div className="mx-auto w-full max-w-3xl rounded-3xl border border-white/10 bg-white/5 p-5 shadow-2xl shadow-black/20 backdrop-blur sm:p-6">
-          <div className="space-y-4">
-            <label
-              htmlFor="startup-idea"
-              className="text-sm font-medium text-slate-200"
-            >
-              Startup idea
-            </label>
+        <div className="mx-auto w-full md:w-[85%] max-w-5xl rounded-[28px] border border-white/10 bg-[#081225] p-8 shadow-2xl min-h-[280px] flex flex-col justify-between">
+          <div>
             <textarea
               ref={textareaRef}
               id="startup-idea"
               value={idea}
               onChange={(event) => setIdea(event.target.value)}
-              placeholder="Describe your startup idea..."
-              rows={4}
-              className="max-h-[420px] w-full resize-none overflow-hidden rounded-2xl border border-white/10 bg-slate-950/80 px-4 py-4 text-sm leading-6 text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/20 sm:text-base"
+              placeholder="Describe your startup idea... e.g. 'An AI copilot for indie e-commerce brands to forecast inventory.'"
+              rows={3}
+              className="w-full resize-none overflow-hidden bg-transparent text-lg leading-relaxed text-white outline-none placeholder:text-slate-500"
             />
-            <button
-              type="button"
-              onClick={handleAnalyze}
-              disabled={loading || !idea.trim()}
-              className="inline-flex min-h-14 items-center justify-center gap-2 rounded-2xl bg-cyan-400 px-6 py-4 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Analyzing
-                </>
-              ) : (
-                <>
-                  Analyze Startup
-                  <ArrowRight className="h-4 w-4" />
-                </>
-              )}
-            </button>
           </div>
+          
+          <div className="mt-8">
+            <div className="flex flex-wrap gap-2 mb-6">
+              {sampleIdeas.map((sample, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setIdea(sample)}
+                  className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs text-slate-300 transition hover:bg-white/10"
+                >
+                  <Sparkles className="h-3 w-3" />
+                  <span className="truncate max-w-[250px] sm:max-w-[350px]">{sample}</span>
+                </button>
+              ))}
+            </div>
 
-          <AnimatePresence mode="wait">
-            {loading ? (
-              <motion.div
-                key="loading"
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                className="mt-4 flex items-center gap-3 rounded-2xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-3 text-sm text-cyan-100"
+            <div className="flex flex-col sm:flex-row items-center justify-end gap-4">
+              <button
+                type="button"
+                onClick={handleAnalyze}
+                disabled={loading || !idea.trim()}
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-indigo-500 px-8 text-sm font-medium text-white transition hover:bg-indigo-400 disabled:opacity-50"
               >
-                <Loader2 className="h-4 w-4 animate-spin" />
-                {loadingMessages[loadingStep]}
-              </motion.div>
-            ) : null}
-          </AnimatePresence>
+                {loading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Analyzing
+                  </>
+                ) : (
+                  <>
+                    Analyze My Idea
+                    <ArrowRight className="h-4 w-4" />
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
 
-        <AnimatePresence>
-          {analysis ? (
-            <motion.div
-              key="results"
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 12 }}
-              transition={{ duration: 0.25 }}
-            >
-              <ResultCards analysis={analysis} />
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
+        {loading && (
+          <div className="mx-auto mt-8 flex max-w-5xl items-center justify-center gap-3 rounded-2xl border border-indigo-500/20 bg-indigo-500/10 px-6 py-4 text-sm text-indigo-200">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            {loadingMessages[loadingStep]}
+          </div>
+        )}
+
+        <div className={`mt-16 w-full mx-auto transition-all duration-300 ${loading ? 'opacity-40 blur-sm pointer-events-none' : 'opacity-100'}`}>
+          <ResultCards analysis={analysis || getSafeDefaultAnalysis()} />
+        </div>
       </div>
     </div>
   );

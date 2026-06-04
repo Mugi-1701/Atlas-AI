@@ -8,14 +8,10 @@ export type StartupIdeaAnalysis = {
   technicalFeasibility: number;
   competition: number;
   timing: number;
-  problemStatement: string;
-  targetAudience: string;
-  swot: {
-    strengths: string[];
-    weaknesses: string[];
-    opportunities: string[];
-    threats: string[];
-  };
+  strengths: string[];
+  weaknesses: string[];
+  opportunities: string[];
+  threats: string[];
   mvpFeatures: string[];
   revenueModel: string[];
   keyRisks: string[];
@@ -24,7 +20,9 @@ export type StartupIdeaAnalysis = {
 
 export type SavedAnalysis = {
   id: string;
-  createdAt: string;
+  idea: string;
+  ideaKey: string;
+  timestamp: number;
   analysis: StartupIdeaAnalysis;
 };
 

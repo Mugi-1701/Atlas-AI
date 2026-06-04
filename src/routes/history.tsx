@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowRight, Inbox } from "lucide-react";
@@ -16,10 +16,11 @@ export const Route = createFileRoute("/history")({
 });
 
 function History() {
+  const navigate = useNavigate();
   const [items, setItems] = useState<SavedAnalysis[]>([]);
   useEffect(() => {
     try {
-      const raw = localStorage.getItem("atlas.history.v1");
+      const raw = localStorage.getItem("atlas-ai-analysis-history");
       if (raw) setItems(JSON.parse(raw));
     } catch {
       // ignore
@@ -42,6 +43,7 @@ function History() {
             </div>
             <Link
               to="/"
+              search={{ id: undefined }}
               className="inline-flex items-center gap-1.5 mt-5 px-4 py-2 rounded-lg text-sm text-primary-foreground"
               style={{ background: "var(--gradient-primary)" }}
             >
@@ -53,18 +55,19 @@ function History() {
             {items.map((it, i) => (
               <motion.div
                 key={it.id}
+                onClick={() => navigate({ to: '/', search: { id: it.id } })}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.04 }}
-                className="glass-card rounded-2xl p-5"
+                className="glass-card rounded-[24px] p-6 cursor-pointer hover:-translate-y-1 hover:border-indigo-500/40 hover:shadow-[0_0_20px_rgba(99,102,241,0.15)] transition-all duration-300"
               >
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>{new Date(it.createdAt).toLocaleString()}</span>
-                  <span className="text-gradient font-semibold">{it.analysis.score}/100</span>
+                  <span>{new Date(it.timestamp).toLocaleString()}</span>
+                  <span className="text-gradient font-semibold">{it.analysis.validationScore}/100</span>
                 </div>
-                <p className="mt-2 text-sm line-clamp-3">{it.analysis.idea}</p>
+                <p className="mt-2 text-sm line-clamp-3">{it.idea}</p>
                 <p className="mt-3 text-xs text-muted-foreground line-clamp-2">
-                  {it.analysis.verdict}
+                  {it.analysis.validationSummary}
                 </p>
               </motion.div>
             ))}
