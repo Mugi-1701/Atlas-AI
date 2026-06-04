@@ -1,5 +1,8 @@
 import { motion } from "framer-motion";
+<<<<<<< ours
 import type { ReactNode } from "react";
+=======
+>>>>>>> theirs
 import type { StartupIdeaAnalysis } from "@/lib/atlas/analysis";
 
 interface ResultCardsProps {
@@ -12,6 +15,7 @@ function Card({
   className = "",
 }: {
   title: string;
+<<<<<<< ours
   children: ReactNode;
   className?: string;
 }) {
@@ -27,6 +31,25 @@ function Card({
         {children}
       </div>
     </motion.section>
+=======
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25 }}
+      className={`rounded-2xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-black/20 backdrop-blur ${className}`}
+    >
+      <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-200">
+        {title}
+      </h3>
+      <div className="mt-4 space-y-4 text-sm leading-6 text-slate-200">
+        {children}
+      </div>
+    </motion.div>
+>>>>>>> theirs
   );
 }
 
@@ -36,7 +59,11 @@ function ListBlock({ items }: { items: string[] }) {
       {items.map((item, index) => (
         <li
           key={`${item}-${index}`}
+<<<<<<< ours
           className="rounded-2xl border border-white/10 bg-slate-950/55 px-4 py-3 text-slate-200"
+=======
+          className="rounded-xl border border-white/10 bg-slate-950/50 px-4 py-3"
+>>>>>>> theirs
         >
           {item}
         </li>
@@ -47,6 +74,7 @@ function ListBlock({ items }: { items: string[] }) {
 
 export function ResultCards({ analysis }: ResultCardsProps) {
   return (
+<<<<<<< ours
     <div className="grid gap-5 md:grid-cols-2">
       <Card title="Validation Score">
         <p className="text-slate-300">{analysis.validationSummary}</p>
@@ -54,6 +82,15 @@ export function ResultCards({ analysis }: ResultCardsProps) {
 
       <Card title="SWOT Analysis">
         <div className="grid gap-5">
+=======
+    <div className="grid gap-5 lg:grid-cols-6">
+      <Card title="Validation Score" className="lg:col-span-2">
+        <p className="text-slate-300">{analysis.validationSummary}</p>
+      </Card>
+
+      <Card title="SWOT Analysis" className="lg:col-span-4">
+        <div className="grid gap-5 md:grid-cols-2">
+>>>>>>> theirs
           <div>
             <p className="mb-3 text-xs uppercase tracking-[0.18em] text-cyan-200">
               Strengths
@@ -81,6 +118,7 @@ export function ResultCards({ analysis }: ResultCardsProps) {
         </div>
       </Card>
 
+<<<<<<< ours
       <Card title="MVP Features">
         <ListBlock items={analysis.mvpFeatures} />
       </Card>
@@ -94,6 +132,21 @@ export function ResultCards({ analysis }: ResultCardsProps) {
       </Card>
 
       <Card title="Investor Pitch">
+=======
+      <Card title="MVP Features" className="lg:col-span-3">
+        <ListBlock items={analysis.mvpFeatures} />
+      </Card>
+
+      <Card title="Revenue Model" className="lg:col-span-3">
+        <ListBlock items={analysis.revenueModel} />
+      </Card>
+
+      <Card title="Key Risks" className="lg:col-span-3">
+        <ListBlock items={analysis.keyRisks} />
+      </Card>
+
+      <Card title="Investor Pitch" className="lg:col-span-6">
+>>>>>>> theirs
         <p className="text-slate-200">{analysis.investorPitch}</p>
       </Card>
     </div>
