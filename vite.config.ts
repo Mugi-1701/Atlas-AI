@@ -7,9 +7,15 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
 export default defineConfig({
+  // Enable Nitro so it auto-detects the Vercel environment and generates
+  // the correct serverless output in .vercel/output instead of a broken
+  // static/cloudflare bundle. Without this, Vercel serves nothing and
+  // returns 404 NOT_FOUND on all routes.
+  nitro: true,
   tanstackStart: {
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
     // nitro/vite builds from this
     server: { entry: "server" },
   },
 });
+
