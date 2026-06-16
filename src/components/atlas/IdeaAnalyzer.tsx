@@ -1,248 +1,285 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowRight, Loader2, Sparkles } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { ArrowRight, Loader2, PlayCircle, Sparkles, Wand2, X } from "lucide-react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { useSearch, useNavigate } from "@tanstack/react-router";
-import { analyzeStartupIdeaFn } from "@/lib/api/groq.functions";
-import { type SavedAnalysis, type StartupIdeaAnalysis, sampleIdeas } from "@/lib/atlas/analysis";
-import { getSafeDefaultAnalysis } from "@/services/groq-analysis";
+import { sampleIdeas, type Analysis, type SavedAnalysis, adaptGroqToAnalysis } from "@/lib/atlas/mock";
+import { analyzeIdea } from "@/lib/api/analyze.functions";
 import { ResultCards } from "./ResultCards";
 
-const STORAGE_KEY = "atlas-ai-analysis-history";
-const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const STORAGE_KEY = "atlas.history.v1";
 
-const loadingMessages = [
-  "Validating startup idea...",
-  "Analyzing market potential...",
-  "Generating SWOT analysis...",
-  "Building MVP roadmap...",
-  "Evaluating revenue opportunities...",
-  "Drafting investor pitch...",
-];
-
-function normalizeIdea(value: string) {
-  return value.trim().replace(/\s+/g, " ").toLowerCase();
-}
-
-function readSavedAnalyses(): SavedAnalysis[] {
-  if (typeof window === "undefined") return [];
-
+function saveToHistory(a: Analysis) {
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-
-    const parsed = JSON.parse(raw) as SavedAnalysis[];
-    const now = Date.now();
-
-    return parsed.filter((item) => item?.timestamp && now - item.timestamp < CACHE_TTL_MS);
+    const raw = localStorage.getItem(STORAGE_KEY);
+    const list: SavedAnalysis[] = raw ? JSON.parse(raw) : [];
+    list.unshift({ id: crypto.randomUUID(), createdAt: new Date().toISOString(), analysis: a });
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(list.slice(0, 25)));
   } catch {
-    return [];
+    // ignore
   }
 }
 
-function writeSavedAnalyses(items: SavedAnalysis[]) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-}
-
-export function IdeaAnalyzer() {
+export function IdeaAnalyzer({ initialId }: { initialId?: string }) {
   const [idea, setIdea] = useState("");
-  const [analysis, setAnalysis] = useState<StartupIdeaAnalysis | null>(null);
   const [loading, setLoading] = useState(false);
-  const [loadingStep, setLoadingStep] = useState(0);
-  const [savedAnalyses, setSavedAnalyses] = useState<SavedAnalysis[]>([]);
-  const requestIdRef = useRef(0);
-  const loadingTimerRef = useRef<number | null>(null);
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const search = useSearch({ strict: false }) as { id?: string };
-  const navigate = useNavigate();
+  const [analysis, setAnalysis] = useState<Analysis | null>(null);
+  const [showDemo, setShowDemo] = useState(false);
 
   useEffect(() => {
-    const loaded = readSavedAnalyses();
-    setSavedAnalyses(loaded);
-
-    if (search.id) {
-      const found = loaded.find((item) => item.id === search.id);
-      if (found) {
-        setIdea(found.idea);
-        setAnalysis(found.analysis);
-      } else {
+    if (initialId) {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const list: SavedAnalysis[] = JSON.parse(raw);
+          const found = list.find((item) => item.id === initialId);
+          if (found) {
+            setIdea(found.analysis.idea);
+            setAnalysis(found.analysis);
+            return;
+          }
+        }
+        throw new Error("Analysis not found");
+      } catch (err) {
         toast.error("Failed to load analysis");
       }
-      navigate({ to: "/", search: { id: undefined }, replace: true });
     }
-  }, []);
+  }, [initialId]);
 
-  useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
-      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
-    }
-  }, [idea]);
-
-  useEffect(() => {
-    if (!loading) {
-      if (loadingTimerRef.current) {
-        window.clearInterval(loadingTimerRef.current);
-        loadingTimerRef.current = null;
-      }
-      setLoadingStep(0);
+  async function runAnalysis(text: string) {
+    if (text.trim().length < 10) {
+      toast.error("Add a bit more detail", { description: "Describe your idea in at least a sentence." });
       return;
     }
-
-    loadingTimerRef.current = window.setInterval(() => {
-      setLoadingStep((current) => (current + 1) % loadingMessages.length);
-    }, 1600);
-
-    return () => {
-      if (loadingTimerRef.current) {
-        window.clearInterval(loadingTimerRef.current);
-        loadingTimerRef.current = null;
-      }
-    };
-  }, [loading]);
-
-  const handleAnalyze = async () => {
-    const trimmedIdea = idea.trim();
-
-    if (!trimmedIdea) {
-      toast.error("Please enter a startup idea before analyzing.");
-      return;
-    }
-
-    const cacheKey = normalizeIdea(trimmedIdea);
-    const cached = savedAnalyses.find((item) => item.ideaKey === cacheKey);
-
-    if (cached) {
-      setAnalysis(cached.analysis);
-      toast.success("Loaded saved analysis.");
-      return;
-    }
-
-    if (loading) return;
-
-    const requestId = requestIdRef.current + 1;
-    requestIdRef.current = requestId;
-
     setLoading(true);
+    setAnalysis(null);
 
     try {
-      const result = await analyzeStartupIdeaFn({ data: { idea: trimmedIdea } });
-      if (requestIdRef.current !== requestId) return;
+      // Call Groq via the TanStack Start server function (server-side only)
+      const groqResult = await analyzeIdea({ data: { idea: text.trim() } });
 
-      console.log("Analysis Result:", result);
+      // Adapt Groq's response shape into the existing Analysis shape used by all UI components
+      const a = adaptGroqToAnalysis(groqResult, text.trim());
 
-      if (!result || typeof result.validationScore !== "number") {
-        toast.error("Invalid AI response received.");
-        return;
-      }
-
-      setAnalysis(result);
-
-      const nextSaved = [
-        {
-          id: crypto.randomUUID(),
-          idea: trimmedIdea,
-          ideaKey: cacheKey,
-          analysis: result,
-          timestamp: Date.now(),
-        },
-        ...savedAnalyses.filter((item) => item.ideaKey !== cacheKey),
-      ];
-
-      setSavedAnalyses(nextSaved);
-      writeSavedAnalyses(nextSaved);
-    } catch (error) {
-      console.error("Groq analysis failed", error);
-      toast.error("AI analysis temporarily unavailable.");
+      setAnalysis(a);
+      saveToHistory(a);
+      toast.success("Analysis ready", { description: `Validation score: ${a.score}/100` });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Something went wrong. Please try again.";
+      toast.error("Analysis failed", { description: message });
     } finally {
-      if (requestIdRef.current === requestId) {
-        setLoading(false);
-      }
+      setLoading(false);
     }
-  };
+  }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 pb-24">
-      <div className="mx-auto flex w-full flex-col px-4 py-10 sm:px-6 lg:px-8 max-w-7xl">
-        <div className="mx-auto flex w-full flex-col items-center text-center mt-12 mb-16">
-          <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-medium tracking-[0.1em] text-slate-300">
-            <Sparkles className="h-4 w-4" />
-            AI Co-Founder · Beta
-          </div>
+    <div className="relative">
+      {/* Hero */}
+      <section className="px-4 md:px-8 pt-10 md:pt-16 pb-8 max-w-6xl mx-auto">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="text-center"
+        >
+          <span className="inline-flex items-center gap-1.5 text-xs px-3 py-1 rounded-full border border-border bg-card/60 mb-5">
+            <Sparkles className="size-3" /> AI Co-Founder · Beta
+          </span>
+          <h1 className="text-4xl md:text-6xl font-semibold tracking-tight leading-[1.05]">
+            Validate Your Startup
+            <br />
+            Idea <span className="text-gradient">with AI</span>
+          </h1>
+          <p className="mt-5 text-base md:text-lg text-muted-foreground max-w-2xl mx-auto">
+            Atlas AI guides you from raw idea to investor-ready plan — validation score, SWOT, MVP scope, revenue model, and pitch in seconds.
+          </p>
+        </motion.div>
 
-          <div className="mt-8 space-y-6 max-w-4xl">
-            <h1 className="text-5xl font-bold tracking-tight text-white md:text-[72px] md:leading-[1.1]">
-              Validate Your Startup <br className="hidden md:block" /> Idea <span className="text-indigo-400">with AI</span>
-            </h1>
-            <p className="mx-auto max-w-2xl text-base leading-relaxed text-slate-400 md:text-lg">
-              Atlas AI guides you from raw idea to investor-ready plan — validation score, SWOT,
-              MVP scope, revenue model, and pitch in seconds.
-            </p>
-          </div>
-        </div>
-
-        <div className="mx-auto w-full md:w-[85%] max-w-5xl rounded-[28px] border border-white/10 bg-[#081225] p-8 shadow-2xl min-h-[280px] flex flex-col justify-between">
-          <div>
-            <textarea
-              ref={textareaRef}
-              id="startup-idea"
-              value={idea}
-              onChange={(event) => setIdea(event.target.value)}
-              placeholder="Describe your startup idea... e.g. 'An AI copilot for indie e-commerce brands to forecast inventory.'"
-              rows={3}
-              className="w-full resize-none overflow-hidden bg-transparent text-lg leading-relaxed text-white outline-none placeholder:text-slate-500"
-            />
-          </div>
-          
-          <div className="mt-8">
-            <div className="flex flex-wrap gap-2 mb-6">
-              {sampleIdeas.map((sample, idx) => (
+        {/* Input */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.15 }}
+          className="mt-10 glass-card rounded-2xl p-2 md:p-3"
+          style={{ boxShadow: "var(--shadow-elegant)" }}
+        >
+          <textarea
+            value={idea}
+            onChange={(e) => setIdea(e.target.value)}
+            placeholder="Describe your startup idea... e.g. 'An AI copilot for indie e-commerce brands to forecast inventory.'"
+            rows={4}
+            className="w-full bg-transparent resize-none outline-none px-4 py-3 text-base placeholder:text-muted-foreground/70"
+          />
+          <div className="flex flex-wrap items-center justify-between gap-3 px-2 pb-2">
+            <div className="flex flex-wrap gap-2">
+              {sampleIdeas.map((s) => (
                 <button
-                  key={idx}
-                  onClick={() => setIdea(sample)}
-                  className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs text-slate-300 transition hover:bg-white/10"
+                  key={s}
+                  onClick={() => setIdea(s)}
+                  className="text-xs px-2.5 py-1 rounded-full border border-border text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
                 >
-                  <Sparkles className="h-3 w-3" />
-                  <span className="truncate max-w-[250px] sm:max-w-[350px]">{sample}</span>
+                  <Wand2 className="inline size-3 mr-1" />
+                  {s.length > 60 ? s.slice(0, 60) + "…" : s}
                 </button>
               ))}
             </div>
-
-            <div className="flex flex-col sm:flex-row items-center justify-end gap-4">
-              <button
-                type="button"
-                onClick={handleAnalyze}
-                disabled={loading || !idea.trim()}
-                className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-indigo-500 px-8 text-sm font-medium text-white transition hover:bg-indigo-400 disabled:opacity-50"
+            <div className="flex items-center gap-2 ml-auto">
+              <motion.button
+                whileTap={{ scale: 0.97 }}
+                whileHover={{ scale: 1.02 }}
+                onClick={() => runAnalysis(idea)}
+                disabled={loading}
+                className="inline-flex items-center gap-1.5 text-sm font-medium px-5 py-2 rounded-lg text-primary-foreground disabled:opacity-70"
+                style={{ background: "var(--gradient-primary)", boxShadow: "var(--shadow-elegant)" }}
               >
                 {loading ? (
                   <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Analyzing
+                    <Loader2 className="size-4 animate-spin" /> Analyzing
                   </>
                 ) : (
                   <>
-                    Analyze My Idea
-                    <ArrowRight className="h-4 w-4" />
+                    Analyze My Idea <ArrowRight className="size-4" />
                   </>
                 )}
-              </button>
+              </motion.button>
             </div>
           </div>
-        </div>
+        </motion.div>
+      </section>
 
-        {loading && (
-          <div className="mx-auto mt-8 flex max-w-5xl items-center justify-center gap-3 rounded-2xl border border-indigo-500/20 bg-indigo-500/10 px-6 py-4 text-sm text-indigo-200">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            {loadingMessages[loadingStep]}
-          </div>
+      {/* Results */}
+      <section className="px-4 md:px-8 pb-16 max-w-6xl mx-auto">
+        <AnimatePresence mode="wait">
+          {loading && <LoadingState key="loading" />}
+          {!loading && analysis && (
+            <motion.div key="results" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+              <ResultCards analysis={analysis} />
+            </motion.div>
+          )}
+          {!loading && !analysis && <EmptyState key="empty" />}
+        </AnimatePresence>
+      </section>
+
+      {/* Demo modal */}
+      <AnimatePresence>
+        {showDemo && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 grid place-items-center p-4 bg-background/60 backdrop-blur-md"
+            onClick={() => setShowDemo(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ type: "spring", stiffness: 280, damping: 24 }}
+              onClick={(e) => e.stopPropagation()}
+              className="glass-card rounded-2xl max-w-lg w-full p-6"
+            >
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="text-xs text-muted-foreground">Quick demo</div>
+                  <h3 className="text-xl font-semibold tracking-tight mt-1">See Atlas in action</h3>
+                </div>
+                <button onClick={() => setShowDemo(false)} className="p-1 rounded hover:bg-card">
+                  <X className="size-4" />
+                </button>
+              </div>
+              <p className="text-sm text-muted-foreground mt-3">
+                We&apos;ll run a full analysis on a sample idea so you can preview the output.
+              </p>
+              <div className="mt-5 flex justify-end gap-2">
+                <button onClick={() => setShowDemo(false)} className="px-4 py-2 text-sm rounded-lg border border-border hover:bg-card">
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    const demo = sampleIdeas[0];
+                    setIdea(demo);
+                    setShowDemo(false);
+                    runAnalysis(demo);
+                  }}
+                  className="px-4 py-2 text-sm rounded-lg text-primary-foreground"
+                  style={{ background: "var(--gradient-primary)" }}
+                >
+                  Run sample analysis
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
         )}
+      </AnimatePresence>
+    </div>
+  );
+}
 
-        <div className={`mt-16 w-full mx-auto transition-all duration-300 ${loading ? 'opacity-40 blur-sm pointer-events-none' : 'opacity-100'}`}>
-          <ResultCards analysis={analysis || getSafeDefaultAnalysis()} />
+function LoadingState() {
+  const labels = ["Parsing idea", "Scoring market signal", "Drafting SWOT", "Composing pitch"];
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-5">
+      <div className="glass-card rounded-2xl p-6">
+        <div className="flex items-center gap-3">
+          <div className="relative size-9">
+            <span className="absolute inset-0 rounded-full animate-ping" style={{ background: "var(--primary)", opacity: 0.25 }} />
+            <span className="absolute inset-1 rounded-full" style={{ background: "var(--gradient-primary)" }} />
+          </div>
+          <div>
+            <div className="text-sm font-medium">Atlas is thinking…</div>
+            <div className="text-xs text-muted-foreground">Structured analysis usually takes a few seconds.</div>
+          </div>
+        </div>
+        <div className="mt-5 grid grid-cols-2 md:grid-cols-4 gap-2">
+          {labels.map((l, i) => (
+            <motion.div
+              key={l}
+              initial={{ opacity: 0.4 }}
+              animate={{ opacity: [0.4, 1, 0.4] }}
+              transition={{ duration: 1.6, repeat: Infinity, delay: i * 0.2 }}
+              className="text-[11px] px-2.5 py-1.5 rounded-md border border-border bg-card/50"
+            >
+              {l}
+            </motion.div>
+          ))}
         </div>
       </div>
-    </div>
+      <div className="grid grid-cols-1 lg:grid-cols-6 gap-5">
+        {(["lg:col-span-2", "lg:col-span-4", "lg:col-span-3", "lg:col-span-3", "lg:col-span-6"] as const).map((cls, i) => (
+          <div key={i} className={`glass-card rounded-2xl p-6 h-40 overflow-hidden relative ${cls}`}>
+            <div className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite]" style={{ background: "linear-gradient(90deg, transparent, oklch(1 0 0 / 0.06), transparent)" }} />
+          </div>
+        ))}
+      </div>
+      <style>{`@keyframes shimmer { 100% { transform: translateX(100%); } }`}</style>
+    </motion.div>
+  );
+}
+
+function EmptyState() {
+  const items = [
+    { title: "Validation Score", desc: "A weighted signal across market, novelty, and feasibility." },
+    { title: "SWOT", desc: "Strengths, weaknesses, opportunities, and threats — instantly." },
+    { title: "MVP scope", desc: "P0 to P2 features so you ship the right thing first." },
+    { title: "Revenue model", desc: "Pricing strategies tuned to your category." },
+    { title: "Investor pitch", desc: "A founder-ready narrative you can read on stage." },
+  ];
+  return (
+    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        {items.map((it, i) => (
+          <motion.div
+            key={it.title}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 + i * 0.06 }}
+            className="glass-card rounded-xl p-4"
+          >
+            <div className="text-xs uppercase tracking-wider text-muted-foreground">{`0${i + 1}`}</div>
+            <div className="font-medium mt-1">{it.title}</div>
+            <div className="text-xs text-muted-foreground mt-1 leading-relaxed">{it.desc}</div>
+          </motion.div>
+        ))}
+      </div>
+    </motion.div>
   );
 }

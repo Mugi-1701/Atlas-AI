@@ -1,12 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { z } from "zod";
 import { IdeaAnalyzer } from "@/components/atlas/IdeaAnalyzer";
 
 export const Route = createFileRoute("/")({
-  validateSearch: (search: Record<string, unknown>) => {
-    return {
-      id: search.id as string | undefined,
-    }
-  },
+  validateSearch: z.object({
+    id: z.string().optional(),
+  }),
   head: () => ({
     meta: [
       { title: "Atlas AI — Idea Analyzer" },
@@ -19,5 +18,6 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
-  return <IdeaAnalyzer />;
+  const { id } = Route.useSearch();
+  return <IdeaAnalyzer initialId={id} />;
 }

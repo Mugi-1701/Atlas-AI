@@ -1,10 +1,9 @@
 import { motion } from "framer-motion";
 
 export function ScoreGauge({ score }: { score: number }) {
-  const displayScore = Math.round(score);
   const radius = 70;
   const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (displayScore / 100) * circumference;
+  const offset = circumference - (score / 100) * circumference;
 
   return (
     <div className="relative size-44">
@@ -15,14 +14,7 @@ export function ScoreGauge({ score }: { score: number }) {
             <stop offset="100%" stopColor="oklch(0.65 0.22 295)" />
           </linearGradient>
         </defs>
-        <circle
-          cx="80"
-          cy="80"
-          r={radius}
-          stroke="oklch(1 0 0 / 0.08)"
-          strokeWidth="10"
-          fill="none"
-        />
+        <circle cx="80" cy="80" r={radius} stroke="oklch(1 0 0 / 0.08)" strokeWidth="10" fill="none" />
         <motion.circle
           cx="80"
           cy="80"
@@ -44,7 +36,7 @@ export function ScoreGauge({ score }: { score: number }) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
         >
-          {displayScore}
+          {score}
         </motion.div>
         <div className="text-xs text-muted-foreground">Validation score</div>
       </div>

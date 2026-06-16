@@ -1,3 +1,5 @@
+import type { StartupAnalysis } from "@/lib/atlas/types";
+
 export type Analysis = {
   idea: string;
   score: number;
@@ -7,8 +9,6 @@ export type Analysis = {
   revenue: { model: string; description: string; potential: "Low" | "Medium" | "High" }[];
   pitch: { hook: string; problem: string; solution: string; market: string; ask: string };
 };
-
-const pick = <T,>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)];
 
 export function generateAnalysis(idea: string): Analysis {
   const seed = idea.trim().length;
@@ -75,3 +75,54 @@ export const sampleIdeas = [
   "An AI copilot for indie e-commerce brands to forecast inventory",
   "A marketplace connecting climate startups with vetted technical talent",
 ];
+
+export type SavedAnalysis = { id: string; createdAt: string; analysis: Analysis };
+
+// ── Groq → Analysis adapter ───────────────────────────────────────────────────
+// Maps Groq's StartupAnalysis shape into the existing Analysis shape expected
+// by ResultCards, ScoreGauge, and the history page — zero UI changes required.
+
+const PRIORITIES = ["P0", "P1", "P2"] as const;
+type Priority = (typeof PRIORITIES)[number];
+
+function assignPriority(index: number): Priority {
+  if (index === 0 || index === 1) return "P0";
+  if (index === 2 || index === 3) return "P1";
+  return "P2";
+}
+
+export function adaptGroqToAnalysis(groq: StartupAnalysis, idea: string): Analysis {
+  // MVP features
+  const mvp = groq.mvpFeatures.map((m, i) => ({
+    feature: m.name,
+    priority: assignPriority(i),
+    rationale: m.description,
+  }));
+
+  // Revenue models
+  const revenue = groq.revenueModel.map(r => ({
+    model: r.streamName,
+    description: `Paid by: ${r.whoPays}. Reason: ${r.whyTheyPay}`,
+    potential: r.potential,
+  }));
+
+  // Pitch
+  const ip = groq.investorPitch;
+  const pitch = {
+    hook: ip.hook,
+    problem: ip.problem,
+    solution: ip.solution,
+    market: ip.market,
+    ask: ip.ask,
+  };
+
+  return {
+    idea,
+    score: groq.validationScore,
+    verdict: `Top strength: ${groq.topStrength} Top concern: ${groq.topConcern}`,
+    swot: groq.swot,
+    mvp,
+    revenue,
+    pitch,
+  };
+}

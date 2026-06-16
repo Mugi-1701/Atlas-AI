@@ -50,6 +50,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             );
           })}
         </nav>
+
       </aside>
 
       {/* Main */}
@@ -65,12 +66,52 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div className="flex items-center gap-2">
             <span className="hidden sm:inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border border-border bg-card/60">
               <span className="size-1.5 rounded-full bg-[oklch(var(--success))]" style={{ background: "var(--success)" }} />
-              All systems nominal
-            </span>
+<span>Atlas AI • Powered by Groq</span>            </span>
             <div className="size-8 rounded-full border border-border" style={{ background: "var(--gradient-primary)" }} />
           </div>
         </header>
-        <main className="flex-1">{children}</main>
+        <main className="flex-1 shrink-0">{children}</main>
+        
+        {/* Footer */}
+        <footer className="mt-auto border-t border-border bg-background/50 px-4 md:px-8 py-10 pb-6 shrink-0">
+          <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between gap-10 md:gap-4">
+            
+            {/* Left */}
+            <div>
+              <div className="font-semibold text-foreground tracking-tight">Atlas AI</div>
+              <div className="text-sm text-muted-foreground mt-1">Your AI Co-Founder for Startup Validation</div>
+              <div className="text-xs text-muted-foreground mt-4">Built by Mugilan M.</div>
+            </div>
+            
+            {/* Center */}
+            <div className="flex flex-col gap-2.5 text-sm text-muted-foreground">
+              <span className="hover:text-foreground cursor-pointer transition-colors">Validation Score</span>
+              <span className="hover:text-foreground cursor-pointer transition-colors">SWOT Analysis</span>
+              <span className="hover:text-foreground cursor-pointer transition-colors">MVP Scope</span>
+              <span className="hover:text-foreground cursor-pointer transition-colors">Revenue Model</span>
+              <span className="hover:text-foreground cursor-pointer transition-colors">Investor Pitch</span>
+            </div>
+            
+            {/* Right */}
+            <div className="text-sm text-muted-foreground text-left md:text-right flex flex-col gap-4">
+              <div>
+                <span className="font-medium text-foreground">Founder</span>
+                <br />
+                Mugilan M.
+              </div>
+              <div>
+                <span className="font-medium text-foreground">Version</span>
+                <br />
+                Beta v1.0
+              </div>
+            </div>
+
+          </div>
+          
+          <div className="max-w-6xl mx-auto mt-10 pt-6 border-t border-border/50 text-xs text-muted-foreground">
+            <p>© 2026 Atlas AI. Built and designed by Mugilan M. All Rights Reserved.</p>
+          </div>
+        </footer>
       </div>
     </div>
   );

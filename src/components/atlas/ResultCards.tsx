@@ -1,125 +1,164 @@
 import { motion } from "framer-motion";
-import type { ReactNode } from "react";
-import type { StartupIdeaAnalysis } from "@/lib/atlas/analysis";
+import { TrendingUp, ShieldAlert, Lightbulb, AlertTriangle, Rocket, DollarSign, Presentation, Check } from "lucide-react";
+import { type Analysis } from "@/lib/atlas/mock";
 import { ScoreGauge } from "./ScoreGauge";
 
-interface ResultCardsProps {
-  analysis: StartupIdeaAnalysis;
-}
+const stagger = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.08, delayChildren: 0.05 } },
+};
+const item = {
+  hidden: { opacity: 0, y: 14 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.45, ease: [0.22, 1, 0.36, 1] as const } },
+};
 
-function Card({
-  title,
-  children,
-  className = "",
-}: {
-  title: string;
-  children: ReactNode;
-  className?: string;
-}) {
+function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
-    <motion.section
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.25 }}
-      className={`flex flex-col h-full rounded-[24px] border border-[rgba(255,255,255,0.08)] bg-[#081225] p-8 shadow-[0_4px_40px_rgba(0,0,0,0.2)] transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-[0_8px_50px_rgba(0,0,0,0.3)] ${className}`}
+    <motion.div
+      variants={item}
+      whileHover={{ y: -3 }}
+      transition={{ type: "spring", stiffness: 280, damping: 22 }}
+      className={`glass-card rounded-2xl p-6 ${className}`}
     >
-      <h3 className="text-[22px] font-semibold text-white mb-6 shrink-0">{title}</h3>
-      <div className="flex-1 flex flex-col text-[15px] leading-relaxed text-slate-300">
-        {children}
-      </div>
-    </motion.section>
+      {children}
+    </motion.div>
   );
 }
 
-function ListBlock({ items }: { items: string[] }) {
-  const displayItems = items.slice(0, 5);
+function CardTitle({ icon: Icon, label, accent }: { icon: React.ElementType; label: string; accent?: string }) {
   return (
-    <ul className="space-y-3 flex-1 flex flex-col justify-start">
-      {displayItems.map((item, index) => (
-        <li
-          key={`${item}-${index}`}
-          className="relative pl-5 before:absolute before:left-0 before:top-[0.6em] before:h-1.5 before:w-1.5 before:rounded-full before:bg-indigo-400 text-[15px] text-slate-300"
-        >
-          {item}
-        </li>
-      ))}
-    </ul>
+    <div className="flex items-center gap-2.5 mb-4">
+      <div
+        className="size-8 rounded-lg flex items-center justify-center border border-border"
+        style={{ background: accent ?? "color-mix(in oklab, var(--primary) 14%, transparent)" }}
+      >
+        <Icon className="size-4" />
+      </div>
+      <h3 className="font-semibold tracking-tight">{label}</h3>
+    </div>
   );
 }
 
-export function ResultCards({ analysis }: ResultCardsProps) {
-  const truncatedSummary = analysis.validationSummary.length > 300 ? analysis.validationSummary.slice(0, 297) + '...' : analysis.validationSummary;
-  const truncatedPitch = analysis.investorPitch.split(' ').slice(0, 120).join(' ') + (analysis.investorPitch.split(' ').length > 120 ? '...' : '');
-
+export function ResultCards({ analysis }: { analysis: Analysis }) {
   return (
-    <div className="grid gap-8 grid-cols-1 md:grid-cols-10">
-      <div className="md:col-span-4 h-[440px]">
-        <Card title="Validation Score" className="items-center text-center">
-          <div className="flex-1 flex items-center justify-center min-h-[220px] mb-4 shrink-0">
-            <ScoreGauge score={analysis.validationScore} />
-          </div>
-          <p className="text-slate-300 line-clamp-3 text-[15px] leading-relaxed">
-            {truncatedSummary}
-          </p>
-        </Card>
-      </div>
+    <motion.div variants={stagger} initial="hidden" animate="show" className="grid grid-cols-1 lg:grid-cols-6 gap-5">
+      {/* Validation score */}
+      <Card className="lg:col-span-2">
+        <CardTitle icon={TrendingUp} label="Validation Score" />
+        <div className="flex flex-col items-center gap-3">
+          <ScoreGauge score={analysis.score} />
+          <p className="text-sm text-center text-muted-foreground leading-relaxed">{analysis.verdict}</p>
+        </div>
+      </Card>
 
-      <div className="md:col-span-6 min-h-[440px] h-auto">
-        <Card title="SWOT Analysis" className="h-full">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-6 h-full">
-            <div className="flex flex-col">
-              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.15em] text-emerald-400 shrink-0">
-                Strengths
-              </p>
-              <ListBlock items={analysis.strengths} />
+      {/* SWOT */}
+      <Card className="lg:col-span-4">
+        <CardTitle icon={ShieldAlert} label="SWOT Analysis" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <SwotBlock title="Strengths" tone="success" items={analysis.swot.strengths} />
+          <SwotBlock title="Weaknesses" tone="warning" items={analysis.swot.weaknesses} />
+          <SwotBlock title="Opportunities" tone="primary" items={analysis.swot.opportunities} />
+          <SwotBlock title="Threats" tone="destructive" items={analysis.swot.threats} />
+        </div>
+      </Card>
+
+      {/* MVP */}
+      <Card className="lg:col-span-3">
+        <CardTitle icon={Rocket} label="MVP Recommendation" />
+        <ul className="space-y-3">
+          {analysis.mvp.map((m) => (
+            <li key={m.feature} className="flex items-start gap-3">
+              <span
+                className={`mt-0.5 text-[10px] font-semibold px-2 py-0.5 rounded-md border border-border ${
+                  m.priority === "P0" ? "text-foreground" : "text-muted-foreground"
+                }`}
+                style={m.priority === "P0" ? { background: "var(--gradient-primary)", color: "var(--primary-foreground)", border: "none" } : {}}
+              >
+                {m.priority}
+              </span>
+              <div>
+                <div className="text-sm font-medium">{m.feature}</div>
+                <div className="text-xs text-muted-foreground">{m.rationale}</div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </Card>
+
+      {/* Revenue */}
+      <Card className="lg:col-span-3">
+        <CardTitle icon={DollarSign} label="Revenue Model" />
+        <div className="space-y-3">
+          {analysis.revenue.map((r) => (
+            <div key={r.model} className="rounded-xl border border-border p-3 hover:border-primary/40 transition-colors">
+              <div className="flex items-center justify-between gap-3">
+                <div className="font-medium text-sm">{r.model}</div>
+                <span
+                  className="text-[10px] px-2 py-0.5 rounded-full border border-border text-muted-foreground"
+                  style={
+                    r.potential === "High"
+                      ? { color: "var(--success)", borderColor: "color-mix(in oklab, var(--success) 40%, transparent)" }
+                      : r.potential === "Medium"
+                        ? { color: "var(--warning)", borderColor: "color-mix(in oklab, var(--warning) 40%, transparent)" }
+                        : {}
+                  }
+                >
+                  {r.potential} potential
+                </span>
+              </div>
+              <div className="text-xs text-muted-foreground mt-1">{r.description}</div>
             </div>
-            <div className="flex flex-col">
-              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.15em] text-rose-400 shrink-0">
-                Weaknesses
-              </p>
-              <ListBlock items={analysis.weaknesses} />
-            </div>
-            <div className="flex flex-col">
-              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.15em] text-sky-400 shrink-0">
-                Opportunities
-              </p>
-              <ListBlock items={analysis.opportunities} />
-            </div>
-            <div className="flex flex-col">
-              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.15em] text-amber-400 shrink-0">
-                Threats
-              </p>
-              <ListBlock items={analysis.threats} />
-            </div>
-          </div>
-        </Card>
-      </div>
+          ))}
+        </div>
+      </Card>
 
-      <div className="md:col-span-5 min-h-[340px] h-auto">
-        <Card title="MVP Features">
-          <ListBlock items={analysis.mvpFeatures} />
-        </Card>
-      </div>
+      {/* Pitch */}
+      <Card className="lg:col-span-6">
+        <CardTitle icon={Presentation} label="Investor Pitch" />
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <PitchBlock label="Hook" value={analysis.pitch.hook} highlight />
+          <PitchBlock label="Problem" value={analysis.pitch.problem} />
+          <PitchBlock label="Solution" value={analysis.pitch.solution} />
+          <PitchBlock label="Market" value={analysis.pitch.market} />
+          <PitchBlock label="The Ask" value={analysis.pitch.ask} highlight />
+        </div>
+      </Card>
+    </motion.div>
+  );
+}
 
-      <div className="md:col-span-5 min-h-[340px] h-auto">
-        <Card title="Revenue Model">
-          <ListBlock items={analysis.revenueModel} />
-        </Card>
+function SwotBlock({ title, items, tone }: { title: string; items: string[]; tone: "success" | "warning" | "primary" | "destructive" }) {
+  const colorVar =
+    tone === "success" ? "var(--success)" : tone === "warning" ? "var(--warning)" : tone === "destructive" ? "var(--destructive)" : "var(--primary)";
+  return (
+    <div className="rounded-xl border border-border p-3">
+      <div className="flex items-center gap-2 mb-2">
+        <span className="size-1.5 rounded-full" style={{ background: colorVar }} />
+        <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{title}</div>
       </div>
+      <ul className="space-y-1.5">
+        {items.map((t) => (
+          <li key={t} className="flex items-start gap-2 text-sm">
+            {tone === "success" ? (
+              <Check className="size-3.5 mt-0.5 shrink-0" style={{ color: colorVar }} />
+            ) : tone === "primary" ? (
+              <Lightbulb className="size-3.5 mt-0.5 shrink-0" style={{ color: colorVar }} />
+            ) : (
+              <AlertTriangle className="size-3.5 mt-0.5 shrink-0" style={{ color: colorVar }} />
+            )}
+            <span className="text-foreground/90">{t}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
-      <div className="md:col-span-10 h-[280px]">
-        <Card title="Key Risks">
-          <ListBlock items={analysis.keyRisks} />
-        </Card>
-      </div>
-
-      <div className="md:col-span-10 h-[220px]">
-        <Card title="Investor Pitch">
-          <p className="text-slate-300 text-[15px] leading-relaxed whitespace-pre-wrap max-w-4xl line-clamp-4">
-            {truncatedPitch}
-          </p>
-        </Card>
-      </div>
+function PitchBlock({ label, value, highlight = false }: { label: string; value: string; highlight?: boolean }) {
+  return (
+    <div className={`rounded-xl p-3 border ${highlight ? "border-primary/30" : "border-border"}`} style={highlight ? { background: "color-mix(in oklab, var(--primary) 8%, transparent)" } : {}}>
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">{label}</div>
+      <div className="text-sm leading-relaxed">{value}</div>
     </div>
   );
 }
